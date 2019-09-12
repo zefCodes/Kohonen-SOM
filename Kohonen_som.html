@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css?family=Khula" rel="stylesheet">
+<style>
+
+* {
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+     box-sizing: border-box;
+}
+
+[class*="col-"] {
+    float:left;
+    padding: 15px;
+    display: table-cell;
+
+}
+
+.col-1 {width: 8.33%;}
+.col-2 {width: 16.66%;}
+.col-3 {width: 25%;}
+.col-4 {width: 33.33%;}
+.col-5 {width: 41.66%;}
+.col-6 {width: 50%;}
+.col-7 {width: 58.33%;}
+.col-8 {width: 66.66%;}
+.col-9 {width: 75%;}
+.col-10 {width: 83.33%;}
+.col-11 {width: 91.66%;}
+.col-12 {width: 100%;}
+
+@keyframes lighten {
+    from {opacity:0;}
+    to {opacity:1;}
+}
+
+body {
+	font-family: 'Khula', sans-serif;
+	font-weight: lighter;
+	color:rgb(150,150,150);
+	text-align:center; 
+	margin-top:80px;
+	padding:0 20% 0 20%;
+	animation-name:lighten;
+	animation-duration: 1s;
+}
+
+.btn {
+	color:rgb(150,150,150);
+	padding: 13px 20px 10px 20px;
+	border:none;
+	margin:10px;
+	background-color:rgb(240,240,240);
+	outline:none;
+	
+}
+
+
+.textInput {
+	color:rgb(150,150,150);
+	padding: 10px 20px 10px 20px;
+	outline:none;
+	border:none;
+	border-bottom:solid;
+	border-bottom-width:2px;
+	border-bottom-color:rgb(240,240,240);
+	margin:10px;
+}
+
+#res {
+	text-align:left;
+
+}
+
+#startstop {
+	width:50px;
+	height:40px;
+	overflow:hidden;
+}
+
+h1 {
+	color:rgb(150,150,150);
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Kohonen Self-Organizing Map</h1><h2>By Joseph Sigbeku</h2>
+<div class="col-12">
+<canvas id =  "drawCanvas" width = "500px" height="500px"></canvas>
+<p>
+
+<button id = "startstop" type="button" onclick="startstop()" class=btn></button>
+<button id = "generateNew" type="button" onclick="generateNew()" class=btn>Generate New</button>
+<input type="number" name="NodesNo" placeholder="Square nodes" style="width:150px" id="nodenum" class=textInput>
+<input type="number" name="iterationNo" style="width:120px" placeholder="Iterations" id="itnum" class=textInput>
+<br/>
+Click 'Generate New' to generate map. &#9658; to run.
+
+</p>
+</div>
+<!--<div class="col-6" id=res>
+<br>
+Convergence Error (every 100 iterations)
+<br>
+<br>
+--<div id = "results"></div>
+</div>-->
+<script>
+//var results = document.getElementById("results");
+var c=document.getElementById("drawCanvas");
+var button = document.getElementById('startstop');
+var ctx=c.getContext("2d");
+var yLoc = 120;
+var xLoc = 100;
+var gridSize = 3;
+var iterationNumber=0;
+var maxIterations=0;
+var scale = 480;
+var transx = 10;
+var transy = 10;
+var start = false;
+var error;
+var tError = 0;
+var started = false;
+var randX;
+var randY;
+var Nodes = [];
+var length;
+function init() {
+	maxIterations=document.getElementById("itnum").value;
+	gridSize=document.getElementById("nodenum").value;
+	length = document.getElementById("itnum").value.length;
+	initWeights();
+	initNeighbours();
+}
+
+function startstop() {
+	if (started) {
+		start^=true;
+		maxIterations=document.getElementById("itnum").value;
+		length = document.getElementById("itnum").value.length;
+	}
+	
+}
+
+function generateNew() {
+	if(document.getElementById("nodenum").value.length>0&&document.getElementById("nodenum").value>0) {
+		Nodes=[];
+		init();
+		iterationNumber=0;
+		start=false;
+		started=true;
+	}
+}
+
+function Node(weightX, weightY, indexI, indexJ, lX, lY){
+	this.weightX = weightX;
+	this.weightY = weightY;
+	this.indexI = indexI;
+	this.indexJ = indexJ;
+	this.lerpX = lX;
+	this.lerpY = lY;
+	var neighbours = [];
+
+	this.getWeightX = function(){
+		return this.weightX;
+	} 
+	this.getWeightY = function(){
+		return this.weightY;
+	} 
+	this.getindexI = function(){
+		return this.indexI;
+	} 
+	this.getindexJ = function(){
+		return this.indexJ;
+	}
+	this.pushNeighbour = function(neighbour){
+		neighbours.push(neighbour);
+	} 	
+	this.getNeighbours = function(neighbour){
+		return neighbours;
+	} 
+	this.setWeightX = function(X){
+		this.weightX=X;
+	} 
+	this.setWeightY = function(Y){
+		this.weightY=Y;
+	} 
+	this.calculateLerp = function() {
+
+		this.lerpX+=(this.weightX - this.lerpX)*0.01;
+		this.lerpY+=(this.weightY - this.lerpY)*0.01;
+	}
+	this.getLerpY = function() {
+		 return this.lerpY;
+	}
+	this.getLerpX = function() {
+		 return this.lerpX;
+	}
+}
+
+function printErrors() {
+	if (iterationNumber%100==0) {
+		tError /= 100;
+		//results.innerHTML+=(parseFloat(tError.toFixed(4))+"%<br>");
+		tError = 0;
+		
+	}else{
+		tError += error;
+	}
+	
+}
+
+function mainLoop() { 
+	clear();
+	if (start) {
+		if (length==0) {
+			update();
+			button.innerHTML = "&#10074;&#10074;";
+		}
+		else if (iterationNumber<maxIterations) {
+			update();
+			button.innerHTML = "&#10074;&#10074;";
+		}
+		else {
+		start=false;
+		}
+		
+	}
+	else {
+		button.innerHTML = "&#9658;";
+	}
+	if (started){
+		
+		draw();
+	} 
+	
+		
+	
+	requestAnimationFrame(mainLoop);
+}
+
+
+
+function clear() {
+	ctx.beginPath(); //
+	ctx.fillStyle = "white";
+	ctx.fillRect(0, 0, 600, 600);
+	ctx.stroke();
+	ctx.closePath();
+}
+
+function generateRandomVector() {
+	randX = Math.random();
+	randY = Math.random();
+}
+function calculateBMU() {
+	var currentNormSquared = 10000;
+	var BMU = 0;
+	for (var i=0; i<gridSize*gridSize; i++) {
+		var x = randX - Nodes[i].getWeightX();
+		var y = randY - Nodes[i].getWeightY();
+		normSquared = x*x + y*y;
+		
+		if (normSquared<currentNormSquared) {
+			currentNormSquared = normSquared;
+			BMU=i;
+		}
+		
+	}
+	//console.log("BEST " + BMU);
+	return BMU;
+}
+
+
+function alterNodes(i) {
+	//console.log(bestNode);
+	var lambda = 1/(1+(Math.log(iterationNumber)));
+	var gamma = 0.5*lambda;
+	var nodeWX = Nodes[i].getWeightX();
+	var nodeWY = Nodes[i].getWeightY();
+	Nodes[i].setWeightX(nodeWX + lambda*(randX-nodeWX));
+	Nodes[i].setWeightY(nodeWY + lambda*(randY-nodeWY));
+	
+	var neighbours = Nodes[i].getNeighbours();
+	for (var i=0; i<neighbours.length; i++) {
+		var nodeNeighbourWX = neighbours[i].getWeightX();
+		var nodeNeighbourWY = neighbours[i].getWeightY();
+		neighbours[i].setWeightX(nodeNeighbourWX + gamma*(randX-nodeNeighbourWX));
+		neighbours[i].setWeightY(nodeNeighbourWY + gamma*(randY-nodeNeighbourWY));
+	}
+}
+
+function computeError() {
+	error=0;
+	for (var i=0; i<gridSize*gridSize; i++) {
+		var err=0;
+		var weightI = Nodes[i].getWeightX();
+		var weightJ = Nodes[i].getWeightY();
+		var neighbours = Nodes[i].getNeighbours();
+		for (var j=0; j<neighbours.length; j++) {
+			var weightI2 = neighbours[j].getWeightX();
+			var weightJ2 = neighbours[j].getWeightY();
+			err+=Math.pow((1/gridSize)-Math.sqrt(Math.pow(weightI2-weightI,2) + Math.pow(weightJ-weightJ2,2)),2);
+			
+		}
+		err=err/neighbours.length;
+		error+=err;
+	}
+	error=error/(gridSize*gridSize);
+}
+
+function update() {
+	iterationNumber++;
+	generateRandomVector();
+	alterNodes(calculateBMU());
+	computeError();
+	printErrors();
+}
+
+function initWeights() {
+
+	for (var i=0; i<gridSize; i++) {
+		for (var j=0; j<gridSize; j++) {
+			var node = new Node(Math.random(), Math.random(), i, j, 0 ,0);
+			Nodes.push(node);
+		}
+	}
+
+}
+
+function isNeighbour(indexI,indexJ,indexI2,indexJ2) {
+	if (indexI+1==indexI2 && indexJ==indexJ2 || indexJ+1==indexJ2 && indexI==indexI2|| indexI-1==indexI2 && indexJ==indexJ2 || indexJ-1==indexJ2 && indexI==indexI2) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+function initNeighbours() {
+	for (var i=0; i<gridSize*gridSize; i++) {
+		var indexI = Nodes[i].getindexI();
+		var indexJ = Nodes[i].getindexJ();
+		for (var j=0; j<gridSize*gridSize; j++) {
+			if(j!=i) {
+				var indexI2 = Nodes[j].getindexI();
+				var indexJ2 = Nodes[j].getindexJ();
+				if (isNeighbour(indexI,indexJ,indexI2,indexJ2)) {
+					Nodes[i].pushNeighbour(Nodes[j]);
+					//console.log("PUSHING NEIGHBOUR " + Nodes[j].getindexI() + ", " + Nodes[j].getindexJ() + " FOR NODE " + i);
+				}
+			}
+			
+		}
+	}
+}
+function drawLine(stx,sty,endx,endy) {
+	ctx.beginPath();
+	ctx.moveTo(stx,sty);
+	ctx.lineTo(endx,endy);
+	ctx.strokeStyle = "rgb(150,150,150)";
+	ctx.stroke();
+	ctx.closePath();
+}
+function drawConnections() {
+	for(var i=0; i<gridSize*gridSize; i++) {
+		var neighbours = Nodes[i].getNeighbours();
+		for(var j=0; j<neighbours.length; j++) {
+			Nodes[i].calculateLerp();
+			neighbours[j].calculateLerp();
+			drawLine((Nodes[i].getLerpX()*scale)+transx,(Nodes[i].getLerpY()*scale)+transy,(neighbours[j].getLerpX()*scale)+transx,(neighbours[j].getLerpY()*scale)+transy);
+			//console.log(i + " Drawing line between " + Nodes[i].getWeightX()+","+Nodes[i].getWeightY() +" and "+ neighbours[j].getWeightX()+","+neighbours[j].getWeightY());
+		}
+		//console.log(i + " " + neighbours.length);
+	}
+	//console.log("complete");
+}
+function drawPoints() {
+	
+	for(var i=0; i<gridSize*gridSize; i++) {
+	
+		Nodes[i].calculateLerp();
+		
+		ctx.beginPath();
+		ctx.arc((Nodes[i].getLerpX()*scale)+transx,(Nodes[i].getLerpY()*scale)+transy,8,0,2*Math.PI);
+		ctx.fillStyle = "white";
+		ctx.fill();
+		ctx.closePath();
+		
+		ctx.beginPath();
+		ctx.arc((Nodes[i].getLerpX()*scale)+transx,(Nodes[i].getLerpY()*scale)+transy,8,0,2*Math.PI);
+		ctx.strokeStyle = "rgb(150,150,150)";
+		ctx.lineWidth=1;
+		ctx.stroke();
+		ctx.closePath();		
+	}	
+}
+
+function drawText() {
+	ctx.font = "15px Calibri";
+	ctx.fillStyle = "rgb(170,170,170)";
+	ctx.fillText("Iteration: " + iterationNumber,20,470);
+	
+	ctx.font = "15px Calibri";
+	ctx.fillStyle = "rgb(170,170,170)";
+	ctx.fillText("Convergence error = " + parseFloat(error.toFixed(4)) + "%",20,490);
+}
+
+function draw() {
+	drawConnections();
+	drawPoints();	
+	drawText();
+}
+
+	Nodes=[];
+	maxIterations=null;
+	gridSize=4
+	length = document.getElementById("itnum").value.length;
+	initWeights();
+	initNeighbours();
+	iterationNumber=0;
+	start=false;
+	started=true;
+
+	if (started) {
+		start^=true;
+		maxIterations=null;
+		length = document.getElementById("itnum").value.length;
+	}
+
+requestAnimationFrame(mainLoop);
+</script>
+
+</body>
+</html>
