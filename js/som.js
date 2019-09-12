@@ -1,4 +1,3 @@
-//var results = document.getElementById("results");
 var c=document.getElementById("drawCanvas");
 var button = document.getElementById('startstop');
 var ctx=c.getContext("2d");
